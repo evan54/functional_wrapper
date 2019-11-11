@@ -75,6 +75,13 @@ class Operation:
     def __gt__(self, right):
         return self.__ge__(right)
 
+    #######################
+    # other
+    #######################
+    def sum(self):
+        return Expression(None, self, lambda x, y: np.sum(y),
+                          lambda x, y: f'sum({y})')
+
     @property
     def value(self):
         raise NotImplementedError
@@ -189,8 +196,9 @@ class Variable(Operation):
         self.value = value
         self._id = Variable._n
         self._name = f'var{self._id}' if name is None else name
-        Variable._n += 1
+        # TODO: add variables that are not just scalars
 
+        Variable._n += 1
         Variable._vars.append(self)
 
     @property
@@ -221,12 +229,14 @@ class Problem:
     def __init__(self, obj, constraints):
         self._obj = self._build_objective_function(obj)
         self._variables = obj.variables()
+        # TODO: constraints
 
     def _assign_to_variables(self, x):
         for i, var in enumerate(self._variables):
             var.value = x[i]
 
     def _initial_guess(self):
+        # TODO: get initial guesses from variables themselves
         return np.ones_like(self._variables)
 
     def minimize(self):
@@ -239,3 +249,20 @@ class Problem:
             self._assign_to_variables(x)
             return expression.value
         return fun
+
+if __name__ == '__main__':
+    x = Variable()
+    y = Variable()
+
+    # fake data
+    a = 2
+    m = 3
+    x = np.linspace(0, 10)
+    y = a * x + m + np.random.randn(len(x))
+
+    a_ = Variable()
+    m_ = Variable()
+    y_ = a_ * x + m_
+    error = y_ - y
+    prob = Problem((error**2).sum(), None)
+    prob.minimize()
