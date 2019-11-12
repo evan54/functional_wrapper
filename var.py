@@ -255,6 +255,8 @@ class Problem:
         self._obj = self._build_objective_function(obj)
         if isinstance(constraints, Constraint):
             constraints = [constraints]
+        elif constraints is None:
+            constraints = []
         self._constraints = self._build_constraints(constraints)
 
     def _assign_to_variables(self, x):
@@ -311,3 +313,5 @@ if __name__ == '__main__':
     error = y_ - y
     prob = Problem((error**2).sum(), None)
     prob.minimize()
+    print(f'a = {a}, a_ = {a_}')
+    print(f'm = {m}, m_ = {m_}')
