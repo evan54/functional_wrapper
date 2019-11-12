@@ -80,12 +80,23 @@ class Operation:
         return self.__ge__(right)
 
     #######################
-    # other
+    # other functions
     #######################
     def sum(self):
         return Expression(None, self, lambda x, y: np.sum(y),
                           lambda x, y: f'sum({y})')
 
+    def exp(self):
+        return Expression(None, self, lambda x, y: np.exp(y),
+                          lambda x, y: f'exp({y})')
+
+    def log(self):
+        return Expression(None, self, lambda x, y: np.log(y),
+                          lambda x, y: f'log({y})')
+
+    #######################
+    # other
+    #######################
     @property
     def value(self):
         raise NotImplementedError
@@ -196,7 +207,20 @@ class Array(Expression):
         return self._get_value_of(self._value)
 
     def __repr__(self):
-        return self._value.__repr__()
+        value = np.copy(self._value)
+        value_ravelled = value.ravel()
+        original_value_ravelled = self._value.ravel()
+        for i in range(len(original_value_ravelled)):
+            val = original_value_ravelled[i]
+            if isinstance(val, Variable):
+                value_ravelled[i] = val.name
+            else:
+                value_ravelled[i] = val
+
+        s = value.__repr__()
+        s = s.replace('array', '').replace(', dtype=object', '')
+        s = '\n'.join(x.strip() for x in s.split('\n'))
+        return s[1:-1]
 
     def variables(self):
         variables = []
@@ -242,22 +266,24 @@ class Variable(Operation):
         self._value = value
 
     def __repr__(self):
-        return f'<{self._name}: {self.value}>'
+        return f'<{self._name}: {self.value:.4f}>'
 
     def __str__(self):
-        return f'<{self._name}: {self.value}>'
+        return f'<{self._name}: {self.value:.4f}>'
 
 
 class Problem:
 
     def __init__(self, obj, constraints=None, tol=1e-6):
+        self._obj = obj
+        self._constraints = constraints
         self._variables = obj.variables()
-        self._obj = self._build_objective_function(obj)
+        self._obj_fun = self._build_objective_function(obj)
         if isinstance(constraints, Constraint):
             constraints = [constraints]
         elif constraints is None:
             constraints = []
-        self._constraints = self._build_constraints(constraints)
+        self._constraint_funs = self._build_constraints(constraints)
 
     def _assign_to_variables(self, x):
         for i, var in enumerate(self._variables):
@@ -268,8 +294,8 @@ class Problem:
                 for x in self._variables]
 
     def minimize(self):
-        opt = minimize(self._obj, self._initial_guess(),
-                       constraints=self._constraints)
+        opt = minimize(self._obj_fun, self._initial_guess(),
+                       constraints=self._constraint_funs)
         self._assign_to_variables(opt.x)
         return opt
 
@@ -298,6 +324,11 @@ class Problem:
                     return (constraint._right - constraint._left).value
                 new.append({'type': 'ineq', 'fun': fun})
         return new
+
+    def __repr__(self):
+        return (f'minimise {self._obj}\n' +
+                's.t.\n' +
+                '\n'.join([f'{c}' for c in self._constraints]))
 
 
 if __name__ == '__main__':
