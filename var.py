@@ -2,6 +2,10 @@ import numpy as np
 from scipy.optimize import minimize
 
 
+def sum(self):
+    return Operation.sum(self)
+
+
 class Operation:
 
     #######################
@@ -61,16 +65,16 @@ class Operation:
     # constraints
     #######################
     def __eq__(self, right):
-        return Expression(self, right, lambda x, y: x == y, '==')
+        return Constraint(self, right, lambda x, y: x == y, '==')
 
     def __le__(self, right):
-        return Expression(self, right, lambda x, y: x <= y, '<=')
+        return Constraint(self, right, lambda x, y: x <= y, '<=')
 
     def __lt__(self, right):
         return self.__le__(right)
 
     def __ge__(self, right):
-        return Expression(self, right, lambda x, y: x >= y, '>=')
+        return Constraint(self, right, lambda x, y: x >= y, '>=')
 
     def __gt__(self, right):
         return self.__ge__(right)
@@ -161,6 +165,21 @@ class Expression(Operation):
         return variables
 
 
+class Constraint(Expression):
+
+    @property
+    def is_equality(self):
+        return self._symbol == '=='
+
+    @property
+    def is_greater_than(self):
+        return self._symbol == '>='
+
+    @property
+    def is_less_than(self):
+        return self._symbol == '<='
+
+
 class Array(Expression):
     def __init__(self, value):
         self._shape = np.shape(value)
@@ -226,21 +245,24 @@ class Variable(Operation):
 
 class Problem:
 
-    def __init__(self, obj, constraints):
-        self._obj = self._build_objective_function(obj)
+    def __init__(self, obj, constraints=None):
         self._variables = obj.variables()
-        # TODO: constraints
+        self._obj = self._build_objective_function(obj)
+        if isinstance(constraints, Constraint):
+            constraints = [constraints]
+        self._constraints = self._build_constraints(constraints)
 
     def _assign_to_variables(self, x):
         for i, var in enumerate(self._variables):
             var.value = x[i]
 
     def _initial_guess(self):
-        # TODO: get initial guesses from variables themselves
-        return np.ones_like(self._variables)
+        return [1. if x.value is None else x.value
+                for x in self._variables]
 
     def minimize(self):
-        opt = minimize(self._obj, self._initial_guess())
+        opt = minimize(self._obj, self._initial_guess(),
+                       constraints=self._constraints)
         self._assign_to_variables(opt.x)
         return opt
 
@@ -249,6 +271,27 @@ class Problem:
             self._assign_to_variables(x)
             return expression.value
         return fun
+
+    def _build_constraints(self, constraints):
+        new = []
+        for constraint in constraints:
+            if constraint.is_equality:
+                def fun(x, constraint=constraint):
+                    self._assign_to_variables(x)
+                    return (constraint._left - constraint._right).value
+                new.append({'type': 'eq', 'fun': fun})
+            elif constraint.is_greater_than:
+                def fun(x, constraint=constraint):
+                    self._assign_to_variables(x)
+                    return (constraint._left - constraint._right).value
+                new.append({'type': 'ineq', 'fun': fun})
+            elif constraint.is_less_than:
+                def fun(x, constraint=constraint):
+                    self._assign_to_variables(x)
+                    return (constraint._right - constraint._left).value
+                new.append({'type': 'ineq', 'fun': fun})
+        return new
+
 
 if __name__ == '__main__':
     x = Variable()
