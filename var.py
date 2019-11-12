@@ -112,6 +112,8 @@ class Expression(Operation):
     def _get_value_of(variable):
         if isinstance(variable, Operation):
             return variable.value
+        elif variable is not None:
+            return float(variable)
         else:
             return variable
 
@@ -203,6 +205,9 @@ class Array(Expression):
                 variables.append(var)
         return variables
 
+    def __getitem__(self, key):
+        return self._value[key]
+
 
 class Variable(Operation):
 
@@ -245,7 +250,7 @@ class Variable(Operation):
 
 class Problem:
 
-    def __init__(self, obj, constraints=None):
+    def __init__(self, obj, constraints=None, tol=1e-6):
         self._variables = obj.variables()
         self._obj = self._build_objective_function(obj)
         if isinstance(constraints, Constraint):
@@ -294,9 +299,6 @@ class Problem:
 
 
 if __name__ == '__main__':
-    x = Variable()
-    y = Variable()
-
     # fake data
     a = 2
     m = 3
