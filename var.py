@@ -11,6 +11,12 @@ def max(arr):
 def min(arr):
     return Operation.min(arr)
 
+def exp(arr):
+    return Operation.exp(arr)
+
+def log(arr):
+    return Operation.log(arr)
+
 
 @np.vectorize
 def value_of(variable):
