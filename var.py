@@ -2,8 +2,24 @@ import numpy as np
 from scipy.optimize import minimize
 
 
-def sum(self):
-    return Operation.sum(self)
+def sum(arr):
+    return Operation.sum(arr)
+
+def max(arr):
+    return Operation.max(arr)
+
+def min(arr):
+    return Operation.min(arr)
+
+
+@np.vectorize
+def value_of(variable):
+    if isinstance(variable, Operation):
+        return variable.value
+    elif variable is not None:
+        return float(variable)
+    else:
+        return variable
 
 
 class Operation:
@@ -86,6 +102,14 @@ class Operation:
         return Expression(None, self, lambda x, y: np.sum(y),
                           lambda x, y: f'sum({y})')
 
+    def min(self):
+        return Expression(None, self, lambda x, y: np.min(y),
+                          lambda x, y: f'min({y})')
+
+    def max(self):
+        return Expression(None, self, lambda x, y: np.max(y),
+                          lambda x, y: f'max({y})')
+
     def exp(self):
         return Expression(None, self, lambda x, y: np.exp(y),
                           lambda x, y: f'exp({y})')
@@ -93,6 +117,9 @@ class Operation:
     def log(self):
         return Expression(None, self, lambda x, y: np.log(y),
                           lambda x, y: f'log({y})')
+
+    def abs(self):
+        return self.__abs__()
 
     #######################
     # other
@@ -118,20 +145,10 @@ class Expression(Operation):
     def right(self):
         return self._right
 
-    @staticmethod
-    @np.vectorize
-    def _get_value_of(variable):
-        if isinstance(variable, Operation):
-            return variable.value
-        elif variable is not None:
-            return float(variable)
-        else:
-            return variable
-
     @property
     def value(self):
-        left_val = self._get_value_of(self._left)
-        right_val = self._get_value_of(self._right)
+        left_val = value_of(self._left)
+        right_val = value_of(self._right)
         return self._method(left_val, right_val)
 
     @staticmethod
@@ -204,7 +221,7 @@ class Array(Expression):
 
     @property
     def value(self):
-        return self._get_value_of(self._value)
+        return value_of(self._value)
 
     def __repr__(self):
         value = np.copy(self._value)
@@ -266,7 +283,10 @@ class Variable(Operation):
         self._value = value
 
     def __repr__(self):
-        return f'<{self._name}: {self.value:.4f}>'
+        if self.value:
+            return f'<{self._name}: {self.value:.4f}>'
+        else:
+            return f'<{self._name}>'
 
     def __str__(self):
         return f'<{self._name}: {self.value:.4f}>'
