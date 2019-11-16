@@ -2,20 +2,49 @@ import numpy as np
 from scipy.optimize import minimize
 
 
+"""
+Wrapper classes for functional expressions
+
+Copyright (C) 2015-2019
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
+
+"""
+Classes:
+* Operation
+* Expression(Operation)
+* Constraint(Expression)
+* Array(Expression)
+* Variable(Operation)
+"""
+
 def sum(arr):
-    return Operation.sum(arr)
+    return Operation.sum(Array(arr))
 
 def max(arr):
-    return Operation.max(arr)
+    return Operation.max(Array(arr))
 
 def min(arr):
-    return Operation.min(arr)
+    return Operation.min(Array(arr))
 
 def exp(arr):
-    return Operation.exp(arr)
+    return Operation.exp(Array(arr))
 
 def log(arr):
-    return Operation.log(arr)
+    return Operation.log(Array(arr))
 
 
 @np.vectorize
@@ -143,6 +172,21 @@ class Expression(Operation):
         self._method = method
         self._symbol = symbol
 
+    def __repr__(self):
+        right_name = self._name(self._right)
+        left_name = self._name(self._left)
+        if isinstance(self._symbol, str):
+            return f'({left_name} {self._symbol} {right_name})'
+        else:
+            return self._symbol(left_name, right_name)
+
+    @staticmethod
+    def _name(var):
+        if var is not None:
+            return var if not hasattr(var, 'name') else var.name
+        else:
+            return ''
+
     @property
     def left(self):
         return self._left
@@ -157,24 +201,6 @@ class Expression(Operation):
         right_val = value_of(self._right)
         return self._method(left_val, right_val)
 
-    @staticmethod
-    def _name(var):
-        if var is not None:
-            return var if not hasattr(var, 'name') else var.name
-        else:
-            return ''
-
-    def _str_expression(self):
-        right_name = self._name(self._right)
-        left_name = self._name(self._left)
-        if isinstance(self._symbol, str):
-            return f'({left_name} {self._symbol} {right_name})'
-        else:
-            return self._symbol(left_name, right_name)
-
-    def __repr__(self):
-        return self._str_expression()
-
     def variables(self):
 
         # helper function
@@ -188,16 +214,16 @@ class Expression(Operation):
             return variables, expressions
 
         # initialise
-        l_expr = [self]
-        l_var = set()
+        list_expr = [self]
+        list_var = set()
 
         while len(l_expr) > 0:
 
             expression = l_expr.pop()
-            l_var, l_expr = update(expression.left, l_var, l_expr)
-            l_var, l_expr = update(expression.right, l_var, l_expr)
+            list_var, list_expr = update(expression.left, list_var, list_expr)
+            list_var, list_expr = update(expression.right, list_var, list_expr)
 
-        variables = [Variable._vars[i] for i in l_var]
+        variables = [Variable._vars[i] for i in list_var]
         return variables
 
 
@@ -221,14 +247,6 @@ class Array(Expression):
         self._shape = np.shape(value)
         self._value = np.array(value)
 
-    @property
-    def shape(self):
-        return self._shape
-
-    @property
-    def value(self):
-        return value_of(self._value)
-
     def __repr__(self):
         value = np.copy(self._value)
         value_ravelled = value.ravel()
@@ -245,15 +263,25 @@ class Array(Expression):
         s = '\n'.join(x.strip() for x in s.split('\n'))
         return s[1:-1]
 
+    def __getitem__(self, key):
+        return self._value[key]
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def value(self):
+        return value_of(self._value)
+
     def variables(self):
         variables = []
         for var in self._value.flatten():
             if isinstance(var, Variable):
                 variables.append(var)
+            elif isinstance(var, Expression):
+                variables.extend(var.variables())
         return variables
-
-    def __getitem__(self, key):
-        return self._value[key]
 
 
 class Variable(Operation):
@@ -272,6 +300,15 @@ class Variable(Operation):
         Variable._n += 1
         Variable._vars.append(self)
 
+    def __repr__(self):
+        if self.value:
+            return f'<{self._name}: {self.value:.4f}>'
+        else:
+            return f'<{self._name}>'
+
+    def __str__(self):
+        return f'<{self._name}: {self.value:.4f}>'
+
     @property
     def id(self):
         return self._id
@@ -288,15 +325,6 @@ class Variable(Operation):
     def value(self, value):
         self._value = value
 
-    def __repr__(self):
-        if self.value:
-            return f'<{self._name}: {self.value:.4f}>'
-        else:
-            return f'<{self._name}>'
-
-    def __str__(self):
-        return f'<{self._name}: {self.value:.4f}>'
-
 
 class Problem:
 
@@ -310,6 +338,11 @@ class Problem:
         elif constraints is None:
             constraints = []
         self._constraint_funs = self._build_constraints(constraints)
+
+    def __repr__(self):
+        return (f'minimise {self._obj}\n' +
+                's.t.\n' +
+                '\n'.join([f'{c}' for c in self._constraints]))
 
     def _assign_to_variables(self, x):
         for i, var in enumerate(self._variables):
@@ -350,11 +383,6 @@ class Problem:
                     return (constraint._right - constraint._left).value
                 new.append({'type': 'ineq', 'fun': fun})
         return new
-
-    def __repr__(self):
-        return (f'minimise {self._obj}\n' +
-                's.t.\n' +
-                '\n'.join([f'{c}' for c in self._constraints]))
 
 
 if __name__ == '__main__':
