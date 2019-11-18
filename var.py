@@ -217,9 +217,9 @@ class Expression(Operation):
         list_expr = [self]
         list_var = set()
 
-        while len(l_expr) > 0:
+        while len(list_expr) > 0:
 
-            expression = l_expr.pop()
+            expression = list_expr.pop()
             list_var, list_expr = update(expression.left, list_var, list_expr)
             list_var, list_expr = update(expression.right, list_var, list_expr)
 
@@ -243,9 +243,16 @@ class Constraint(Expression):
 
 
 class Array(Expression):
-    def __init__(self, value):
-        self._shape = np.shape(value)
-        self._value = np.array(value)
+
+    def __init__(self, value=None, shape=None):
+        if value is not None and shape is None:
+            self._shape = np.shape(value)
+            self._value = np.array(value)
+        elif value is None and shape is not None:
+            self._shape = shape
+            self._value = np.empty(shape, dtype=object)
+            for i in range(np.prod(shape)):
+                self._value[np.unravel_index(i, shape)] = Variable()
 
     def __repr__(self):
         value = np.copy(self._value)
@@ -288,7 +295,6 @@ class Variable(Operation):
 
     _n = 0
     _initial_guesses = []
-    _x = []
     _vars = []
 
     def __init__(self, name=None, value=None):
